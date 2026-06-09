@@ -151,7 +151,7 @@ class SparkViewModel(application: Application) : AndroidViewModel(application) {
             
             // Set simulated typing state for realism
             _isPartnerTyping.value = true
-            delay(1800) // Aesthetic visual pause
+            delay(1400) // Aesthetic visual pause
             
             // Call Gemini API or offline generator
             val reply = repository.getAiReply(candidateId, text)
@@ -159,6 +159,51 @@ class SparkViewModel(application: Application) : AndroidViewModel(application) {
             
             // Insert partner reply
             repository.insertMessage(candidateId, reply, isFromMe = false)
+        }
+    }
+
+    fun sendRichMessage(
+        text: String,
+        msgType: String,
+        mediaUri: String? = null,
+        mediaDuration: Int = 0,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        locationName: String? = null
+    ) {
+        val candidateId = _activeChatCandidateId.value ?: return
+
+        viewModelScope.launch {
+            // Save user instruction
+            repository.insertMessage(
+                candidateId = candidateId,
+                text = text,
+                isFromMe = true,
+                msgType = msgType,
+                mediaUri = mediaUri,
+                mediaDuration = mediaDuration,
+                latitude = latitude,
+                longitude = longitude,
+                locationName = locationName
+            )
+            
+            // Set simulated typing state for realism
+            _isPartnerTyping.value = true
+            delay(1500) // Aesthetic visual pause
+            
+            // Generate responsive reply based on the message type
+            val replyText = when (msgType) {
+                "IMAGE" -> "Wow, that looks absolutely beautiful! Where did you take that picture? 😍"
+                "VIDEO" -> "Haha, I love this! Super fun video. It totally made my day! 🎥✨"
+                "VOICE" -> "Oh, you have such a lovely voice! It's so nice to hear the person behind the screen. 📻😊"
+                "LOCATION" -> "Ooh, I know exactly where that is! That's a cozy area. We should get together nearby! 🗺️📍"
+                "DOCUMENT" -> "Awesome, I'll review this file right away! Looks like we have some homework. 📄😉"
+                else -> repository.getAiReply(candidateId, text)
+            }
+            _isPartnerTyping.value = false
+            
+            // Insert partner reply
+            repository.insertMessage(candidateId, replyText, isFromMe = false)
         }
     }
 

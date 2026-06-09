@@ -45,5 +45,11 @@ data class Message(
     val candidateId: Int,
     val text: String,
     val isFromMe: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val msgType: String = "TEXT", // "TEXT", "IMAGE", "VIDEO", "VOICE", "LOCATION", "DOCUMENT"
+    val mediaUri: String? = null,
+    val mediaDuration: Int = 0, // In seconds (for voice or video)
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationName: String? = null
 )

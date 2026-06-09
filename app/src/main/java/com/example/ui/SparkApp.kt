@@ -103,6 +103,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -801,9 +804,36 @@ fun DiscoverTab(viewModel: SparkViewModel) {
             } else {
                 // Display top candidate card stack (shows the first candidate card cleanly)
                 val topCandidate = candidates.first()
+                var offsetX by remember(topCandidate.id) { mutableStateOf(0f) }
+                var offsetY by remember(topCandidate.id) { mutableStateOf(0f) }
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = offsetX
+                            translationY = offsetY
+                            rotationZ = (offsetX / 18f)
+                        }
+                        .pointerInput(topCandidate.id) {
+                            detectDragGestures(
+                                onDragEnd = {
+                                    if (offsetX > 150f) {
+                                        viewModel.swipe(topCandidate, isLiked = true)
+                                    } else if (offsetX < -150f) {
+                                        viewModel.swipe(topCandidate, isLiked = false)
+                                    } else {
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    offsetX += dragAmount.x
+                                    offsetY += dragAmount.y
+                                }
+                            )
+                        }
                         .shadow(16.dp, RoundedCornerShape(32.dp))
                         .clip(RoundedCornerShape(32.dp))
                         .background(Color(0xFF2B2930))
@@ -1263,6 +1293,7 @@ fun MatchesInboxTab(viewModel: SparkViewModel) {
 fun MyProfileTab(viewModel: SparkViewModel) {
     val userProfile by viewModel.userProfile.collectAsState()
     val matches by viewModel.matchedCandidates.collectAsState()
+    val discoverable by viewModel.discoverableCandidates.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
 
@@ -1342,7 +1373,7 @@ fun MyProfileTab(viewModel: SparkViewModel) {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "8", // Local seeded pool
+                            text = discoverable.size.toString(), // Local seeded pool size
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -1776,6 +1807,7 @@ fun ChatRoomScreen(
     val messages by viewModel.activeChatMessages.collectAsState()
     val isTyping by viewModel.isPartnerTyping.collectAsState()
     var inputStr by remember { mutableStateOf("") }
+    var showAttachments by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
     val rawListState = rememberLazyListState()
@@ -1890,7 +1922,7 @@ fun ChatRoomScreen(
             items(messages) { message ->
                 val fromUser = message.isFromMe
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     contentAlignment = if (fromUser) Alignment.CenterEnd else Alignment.CenterStart
                 ) {
                     Column(
@@ -1916,12 +1948,187 @@ fun ChatRoomScreen(
                                 )
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
-                            Text(
-                                text = message.text,
-                                color = if (fromUser) Color.White else Color(0xFFDEDAE4),
-                                fontSize = 14.sp,
-                                lineHeight = 18.sp
-                            )
+                            when (message.msgType) {
+                                "IMAGE" -> {
+                                    Column {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(130.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(Color(0xFF493A54), Color(0xFF1E1428))
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(text = "🌅🖼️", fontSize = 38.sp)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "Tap to view in High-Res",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White.copy(alpha = 0.7f),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = message.text,
+                                            color = Color.White,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                                "VIDEO" -> {
+                                    Column {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(130.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(Color(0xFF2E3E5C), Color(0xFF111D33))
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(44.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color.White.copy(alpha = 0.3f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(text = "▶️", fontSize = 20.sp, modifier = Modifier.offset(x = 1.dp))
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = "Video Length: ${message.mediaDuration}s",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = message.text,
+                                            color = Color.White,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                                "VOICE" -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    ) {
+                                        Text(text = "🎙️", fontSize = 22.sp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(120.dp)
+                                                        .height(4.dp)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(Color.White.copy(alpha = 0.3f))
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth(0.35f)
+                                                            .fillMaxHeight()
+                                                            .background(Color.White)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "${message.mediaDuration}s",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Voice Message",
+                                                fontSize = 10.sp,
+                                                color = Color.White.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+                                }
+                                "LOCATION" -> {
+                                    Column(modifier = Modifier.width(220.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(110.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color(0xFF2E4D3B)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(text = "🗺️📍", fontSize = 28.sp)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "${message.latitude}, ${message.longitude}",
+                                                    fontSize = 10.sp,
+                                                    color = Color.White.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = message.locationName ?: "Shared Location",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = "Tap to open in Google Maps",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                                "DOCUMENT" -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    ) {
+                                        Text(text = "📄", fontSize = 24.sp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = message.text,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "PDF Document • 420 KB",
+                                                color = Color.White.copy(alpha = 0.6f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    Text(
+                                        text = message.text,
+                                        color = if (fromUser) Color.White else Color(0xFFDEDAE4),
+                                        fontSize = 14.sp,
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1969,70 +2176,148 @@ fun ChatRoomScreen(
                 .border(0.5.dp, Color(0xFF2C2533))
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = inputStr,
-                    onValueChange = { inputStr = it },
-                    placeholder = { Text("Say something lovely...", color = Color(0xFF8B8894)) },
+            Column {
+                if (showAttachments) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF221A28))
+                            .border(width = 0.5.dp, color = Color(0xFF2C2533))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item {
+                            AttachmentChip(
+                                label = "Photo 📸",
+                                color = Color(0xFF9B59B6),
+                                onClick = {
+                                    viewModel.sendRichMessage("Here is a scenic photo! 🌄☕", "IMAGE", mediaUri = "image_sunset.png")
+                                    showAttachments = false
+                                }
+                            )
+                        }
+                        item {
+                            AttachmentChip(
+                                label = "Video 🎥",
+                                color = Color(0xFF3498DB),
+                                onClick = {
+                                    viewModel.sendRichMessage("Check out our holiday video clip! 🌴🍿", "VIDEO", mediaUri = "video_trip.mp4", mediaDuration = 8)
+                                    showAttachments = false
+                                }
+                            )
+                        }
+                        item {
+                            AttachmentChip(
+                                label = "Voice 🎙️",
+                                color = Color(0xFFE67E22),
+                                onClick = {
+                                    viewModel.sendRichMessage("Sent a voice message", "VOICE", mediaUri = "voice_note.mp3", mediaDuration = 14)
+                                    showAttachments = false
+                                }
+                            )
+                        }
+                        item {
+                            AttachmentChip(
+                                label = "Location 📍",
+                                color = Color(0xFF2ECC71),
+                                onClick = {
+                                    viewModel.sendRichMessage("Shared coordinates 🗺️📍", "LOCATION", latitude = 30.2741, longitude = -97.7404, locationName = "Downtown Coffee Place")
+                                    showAttachments = false
+                                }
+                            )
+                        }
+                        item {
+                            AttachmentChip(
+                                label = "Document 📄",
+                                color = Color(0xFFE74C3C),
+                                onClick = {
+                                    viewModel.sendRichMessage("Our_Match_Dating_Checklist.pdf", "DOCUMENT", mediaUri = "checklist.pdf")
+                                    showAttachments = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .testTag("chat_input_field"),
-                    maxLines = 4,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFD0BCFF),
-                        unfocusedBorderColor = Color(0xFF49454F).copy(alpha = 0.5f),
-                        focusedContainerColor = Color(0xFF1C1B1F),
-                        unfocusedContainerColor = Color(0xFF1C1B1F)
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Send
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { showAttachments = !showAttachments },
+                        modifier = Modifier.testTag("chat_attach_trigger")
+                    ) {
+                        Icon(
+                            imageVector = if (showAttachments) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = "Attach media items",
+                            tint = Color(0xFFFF4B72),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    OutlinedTextField(
+                        value = inputStr,
+                        onValueChange = { inputStr = it },
+                        placeholder = { Text("Say something lovely...", color = Color(0xFF8B8894)) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("chat_input_field"),
+                        maxLines = 4,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFFD0BCFF),
+                            unfocusedBorderColor = Color(0xFF49454F).copy(alpha = 0.5f),
+                            focusedContainerColor = Color(0xFF1C1B1F),
+                            unfocusedContainerColor = Color(0xFF1C1B1F)
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                if (inputStr.trim().isNotEmpty()) {
+                                    viewModel.sendMessage(inputStr)
+                                    inputStr = ""
+                                }
+                            }
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
                             if (inputStr.trim().isNotEmpty()) {
                                 viewModel.sendMessage(inputStr)
                                 inputStr = ""
                             }
-                        }
-                    )
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = {
-                        if (inputStr.trim().isNotEmpty()) {
-                            viewModel.sendMessage(inputStr)
-                            inputStr = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .shadow(4.dp, CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFFFF6B8B), Color(0xFFFF305D))
-                            ),
-                            shape = CircleShape
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(4.dp, CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFFFF6B8B), Color(0xFFFF305D))
+                                ),
+                                shape = CircleShape
+                            )
+                            .testTag("chat_send_button"),
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
-                        .testTag("chat_send_button"),
-                    colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    }
                 }
             }
         }
@@ -2220,4 +2505,28 @@ fun formatShortTime(timestamp: Long): String {
     val date = java.util.Date(timestamp)
     val formatter = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
     return formatter.format(date)
+}
+
+@Composable
+fun AttachmentChip(
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(color = color.copy(alpha = 0.15f))
+            .border(width = 1.dp, color = color, shape = RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+    }
 }

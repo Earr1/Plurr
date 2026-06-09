@@ -35,8 +35,28 @@ class SparkRepository(private val appDao: AppDao) {
         appDao.insertSwipe(swipe)
     }
 
-    suspend fun insertMessage(candidateId: Int, text: String, isFromMe: Boolean) = withContext(Dispatchers.IO) {
-        val message = Message(candidateId = candidateId, text = text, isFromMe = isFromMe)
+    suspend fun insertMessage(
+        candidateId: Int,
+        text: String,
+        isFromMe: Boolean,
+        msgType: String = "TEXT",
+        mediaUri: String? = null,
+        mediaDuration: Int = 0,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        locationName: String? = null
+    ) = withContext(Dispatchers.IO) {
+        val message = Message(
+            candidateId = candidateId,
+            text = text,
+            isFromMe = isFromMe,
+            msgType = msgType,
+            mediaUri = mediaUri,
+            mediaDuration = mediaDuration,
+            latitude = latitude,
+            longitude = longitude,
+            locationName = locationName
+        )
         appDao.insertMessage(message)
     }
 
