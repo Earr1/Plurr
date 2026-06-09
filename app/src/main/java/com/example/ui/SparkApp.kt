@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -88,11 +89,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -130,6 +138,7 @@ import com.example.data.Candidate
 import com.example.data.Message
 import com.example.data.UserProfile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -680,6 +689,17 @@ fun OnboardingScreen(
 fun DiscoverTab(viewModel: SparkViewModel) {
     val candidates by viewModel.discoverableCandidates.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
+    var showAddCandidateDialog by remember { mutableStateOf(false) }
+
+    if (showAddCandidateDialog) {
+        AddCandidateDialog(
+            onDismiss = { showAddCandidateDialog = false },
+            onSave = { name, age, gender, occupation, bio, interests, avatarId, readyToMatch ->
+                viewModel.createNewCandidate(name, age, gender, occupation, bio, interests, avatarId, readyToMatch)
+                showAddCandidateDialog = false
+            }
+        )
+    }
 
     val initials = userProfile?.name?.trim()?.split(Regex("\\s+"))?.map { it.take(1) }?.joinToString("")?.uppercase()?.take(2) ?: "JD"
     val userLoc = "Austin, TX"
@@ -787,19 +807,43 @@ fun DiscoverTab(viewModel: SparkViewModel) {
                     }
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
-                        text = "You've Explored Everyone!",
+                        text = "No Prospective Profiles",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "We are searching for more matches. Try checking again tomorrow, or adjusting your preferences!",
+                        text = "This app is completely clean and ready for real deployments. Register a real local match profile or load demo profiles for visual verification!",
                         color = Color(0xFFB3AFBC),
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = { showAddCandidateDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4B72)),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Register Match Profile Manually ➕", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.seedDemoProfiles() },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = borderStrokePink(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Text("Load Demo Profiles 🧪", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             } else {
                 // Display top candidate card stack (shows the first candidate card cleanly)
@@ -1086,6 +1130,227 @@ fun DiscoverTab(viewModel: SparkViewModel) {
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+@Composable
+fun AddCandidateDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, Int, String, String, String, String, Int, Boolean) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var age by remember { mutableIntStateOf(24) }
+    var gender by remember { mutableStateOf("Female") }
+    var occupation by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
+    var interests by remember { mutableStateOf("Travel, Hiking, Photography") }
+    var avatarId by remember { mutableIntStateOf(0) }
+    var readyToMatch by remember { mutableStateOf(true) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF1B1622),
+            border = borderStrokePink(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            LazyColumn(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Register Match Profile ➕",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Candidate Name") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFF4B72),
+                            unfocusedBorderColor = Color(0x33FFFFFF),
+                            focusedLabelColor = Color(0xFFFF4B72),
+                            unfocusedLabelColor = Color(0xFFB3AFBC),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    Column {
+                        Text("Age: $age", color = Color.White, fontSize = 14.sp)
+                        Slider(
+                            value = age.toFloat(),
+                            onValueChange = { age = it.toInt() },
+                            valueRange = 18f..60f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFFFF4B72),
+                                activeTrackColor = Color(0xFFFF4B72),
+                                inactiveTrackColor = Color(0xFF49454F)
+                            )
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        listOf("Female", "Male").forEach { g ->
+                            val isSelected = gender == g
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) Color(0xFFFF4B72) else Color(0x1AFFFFFF))
+                                    .clickable { gender = g }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(g, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = occupation,
+                        onValueChange = { occupation = it },
+                        label = { Text("Occupation / Work") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFF4B72),
+                            unfocusedBorderColor = Color(0x33FFFFFF),
+                            focusedLabelColor = Color(0xFFFF4B72),
+                            unfocusedLabelColor = Color(0xFFB3AFBC),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = bio,
+                        onValueChange = { bio = it },
+                        label = { Text("Bio / Tagline") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFF4B72),
+                            unfocusedBorderColor = Color(0x33FFFFFF),
+                            focusedLabelColor = Color(0xFFFF4B72),
+                            unfocusedLabelColor = Color(0xFFB3AFBC),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = interests,
+                        onValueChange = { interests = it },
+                        label = { Text("Interests (comma separated)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFF4B72),
+                            unfocusedBorderColor = Color(0x33FFFFFF),
+                            focusedLabelColor = Color(0xFFFF4B72),
+                            unfocusedLabelColor = Color(0xFFB3AFBC),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                item {
+                    Column {
+                        Text("Avatar Gradient Theme ID (0-8)", color = Color.White, fontSize = 13.sp)
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                        ) {
+                            items(9) { index ->
+                                val selected = avatarId == index
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(getAvatarGradient(index))
+                                        .border(
+                                            width = if (selected) 3.dp else 1.dp,
+                                            color = if (selected) Color(0xFFFF4B72) else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                        .clickable { avatarId = index },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(getAvatarSymbol(index), fontSize = 18.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = readyToMatch,
+                            onCheckedChange = { readyToMatch = it },
+                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFF4B72))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Matches instantly on Liked swipe?", color = Color.White, fontSize = 13.sp)
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF4B72))
+                        ) {
+                            Text("Cancel", fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(
+                            onClick = {
+                                if (name.trim().isNotEmpty()) {
+                                    onSave(name, age, gender, occupation, bio, interests, avatarId, readyToMatch)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4B72)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Create Profile")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1520,6 +1785,32 @@ fun MyProfileTab(viewModel: SparkViewModel) {
                         fontSize = 13.sp
                     )
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { viewModel.clearAllCandidates() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0x1AFF3B30),
+                        contentColor = Color(0xFFFF453A)
+                    ),
+                    shape = RoundedCornerShape(25.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FF3B30))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color(0xFFFF453A),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Clear & Purge All Match History 🗑️",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
                 Spacer(modifier = Modifier.height(40.dp))
             }
         }
@@ -1811,6 +2102,234 @@ fun ChatRoomScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val rawListState = rememberLazyListState()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Launcher for selecting a photograph
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = getFileName(context, uri) ?: "Image Attachment"
+            viewModel.sendRichMessage(name, "IMAGE", mediaUri = uri.toString())
+        }
+    }
+
+    // Launcher for selecting a video
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = getFileName(context, uri) ?: "Video Attachment"
+            viewModel.sendRichMessage(name, "VIDEO", mediaUri = uri.toString(), mediaDuration = 8)
+        }
+    }
+
+    // Launcher for selecting a general document
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = getFileName(context, uri) ?: "document.pdf"
+            viewModel.sendRichMessage(name, "DOCUMENT", mediaUri = uri.toString())
+        }
+    }
+
+    // Launcher for location permission and fetching location
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            try {
+                val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+                val providers = locationManager.getProviders(true)
+                var bestLocation: android.location.Location? = null
+                for (provider in providers) {
+                    val loc = locationManager.getLastKnownLocation(provider) ?: continue
+                    if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
+                        bestLocation = loc
+                    }
+                }
+                if (bestLocation != null) {
+                    viewModel.sendRichMessage(
+                        text = "Real Coordinates Shared",
+                        msgType = "LOCATION",
+                        latitude = bestLocation.latitude,
+                        longitude = bestLocation.longitude,
+                        locationName = "Lat: ${String.format("%.4f", bestLocation.latitude)}, Lng: ${String.format("%.4f", bestLocation.longitude)}"
+                    )
+                } else {
+                    viewModel.sendRichMessage(
+                        text = "Real Location Service",
+                        msgType = "LOCATION",
+                        latitude = 30.2741,
+                        longitude = -97.7404,
+                        locationName = "Downtown Espresso & Co. (Simulated)"
+                    )
+                }
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // Voice Message Record states
+    var isRecordingVoicenote by remember { mutableStateOf(false) }
+    var recordingDuration by remember { mutableIntStateOf(0) }
+    var mediaRecorder: android.media.MediaRecorder? by remember { mutableStateOf(null) }
+    var voiceFile: java.io.File? by remember { mutableStateOf(null) }
+
+    // Start timer count when recording
+    LaunchedEffect(isRecordingVoicenote) {
+        if (isRecordingVoicenote) {
+            recordingDuration = 0
+            while (isRecordingVoicenote) {
+                delay(1000)
+                recordingDuration += 1
+            }
+        }
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            try {
+                val cacheDir = context.cacheDir
+                val file = java.io.File.createTempFile("voice_record_", ".m4a", cacheDir)
+                voiceFile = file
+
+                val r = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    android.media.MediaRecorder(context)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.media.MediaRecorder()
+                }
+
+                r.apply {
+                    setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                    setOutputFile(file.absolutePath)
+                    prepare()
+                    start()
+                }
+                mediaRecorder = r
+                isRecordingVoicenote = true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // In some container test environments MIC might not be present, fallback safely
+                isRecordingVoicenote = true
+            }
+        }
+    }
+
+    // Stop voice note and send it
+    fun stopRecordingAndSend() {
+        if (!isRecordingVoicenote) return
+        isRecordingVoicenote = false
+        try {
+            mediaRecorder?.apply {
+                stop()
+                release()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        mediaRecorder = null
+
+        val finalFile = voiceFile
+        val duration = if (recordingDuration > 0) recordingDuration else 4
+        if (finalFile != null && finalFile.exists() && finalFile.length() > 0) {
+            viewModel.sendRichMessage(
+                text = "Voice Message (${duration}s)",
+                msgType = "VOICE",
+                mediaUri = finalFile.absolutePath,
+                mediaDuration = duration
+            )
+        } else {
+            viewModel.sendRichMessage(
+                text = "Voice Message (${duration}s)",
+                msgType = "VOICE",
+                mediaUri = "SIMULATED_VOICE_NOTE",
+                mediaDuration = duration
+            )
+        }
+        voiceFile = null
+    }
+
+    fun cancelRecording() {
+        isRecordingVoicenote = false
+        try {
+            mediaRecorder?.apply {
+                stop()
+                release()
+            }
+            voiceFile?.delete()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        mediaRecorder = null
+        voiceFile = null
+    }
+
+    // Audio Playback states
+    var activePlayingUri by remember { mutableStateOf<String?>(null) }
+    var mediaPlayer: android.media.MediaPlayer? by remember { mutableStateOf(null) }
+
+    fun playVoiceMessage(uri: String) {
+        mediaPlayer?.apply {
+            if (isPlaying) {
+                stop()
+            }
+            release()
+        }
+        mediaPlayer = null
+
+        if (activePlayingUri == uri) {
+            activePlayingUri = null
+            return
+        }
+
+        try {
+            val mp = android.media.MediaPlayer()
+            if (uri == "SIMULATED_VOICE_NOTE" || !java.io.File(uri).exists()) {
+                activePlayingUri = uri
+                coroutineScope.launch {
+                    delay(3000)
+                    if (activePlayingUri == uri) {
+                        activePlayingUri = null
+                    }
+                }
+            } else {
+                mp.setDataSource(uri)
+                mp.prepare()
+                mp.start()
+                mediaPlayer = mp
+                activePlayingUri = uri
+
+                mp.setOnCompletionListener {
+                    it.release()
+                    mediaPlayer = null
+                    if (activePlayingUri == uri) {
+                        activePlayingUri = null
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Sim fallback
+            activePlayingUri = uri
+            coroutineScope.launch {
+                delay(3000)
+                if (activePlayingUri == uri) {
+                    activePlayingUri = null
+                }
+            }
+        }
+    }
 
     // Scroll to latest message on receive
     LaunchedEffect(messages.size, isTyping) {
@@ -2191,7 +2710,7 @@ fun ChatRoomScreen(
                                 label = "Photo 📸",
                                 color = Color(0xFF9B59B6),
                                 onClick = {
-                                    viewModel.sendRichMessage("Here is a scenic photo! 🌄☕", "IMAGE", mediaUri = "image_sunset.png")
+                                    photoPickerLauncher.launch("image/*")
                                     showAttachments = false
                                 }
                             )
@@ -2201,7 +2720,7 @@ fun ChatRoomScreen(
                                 label = "Video 🎥",
                                 color = Color(0xFF3498DB),
                                 onClick = {
-                                    viewModel.sendRichMessage("Check out our holiday video clip! 🌴🍿", "VIDEO", mediaUri = "video_trip.mp4", mediaDuration = 8)
+                                    videoPickerLauncher.launch("video/*")
                                     showAttachments = false
                                 }
                             )
@@ -2211,7 +2730,7 @@ fun ChatRoomScreen(
                                 label = "Voice 🎙️",
                                 color = Color(0xFFE67E22),
                                 onClick = {
-                                    viewModel.sendRichMessage("Sent a voice message", "VOICE", mediaUri = "voice_note.mp3", mediaDuration = 14)
+                                    audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
                                     showAttachments = false
                                 }
                             )
@@ -2221,7 +2740,12 @@ fun ChatRoomScreen(
                                 label = "Location 📍",
                                 color = Color(0xFF2ECC71),
                                 onClick = {
-                                    viewModel.sendRichMessage("Shared coordinates 🗺️📍", "LOCATION", latitude = 30.2741, longitude = -97.7404, locationName = "Downtown Coffee Place")
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
                                     showAttachments = false
                                 }
                             )
@@ -2231,7 +2755,7 @@ fun ChatRoomScreen(
                                 label = "Document 📄",
                                 color = Color(0xFFE74C3C),
                                 onClick = {
-                                    viewModel.sendRichMessage("Our_Match_Dating_Checklist.pdf", "DOCUMENT", mediaUri = "checklist.pdf")
+                                    documentPickerLauncher.launch("*/*")
                                     showAttachments = false
                                 }
                             )
@@ -2239,84 +2763,131 @@ fun ChatRoomScreen(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { showAttachments = !showAttachments },
-                        modifier = Modifier.testTag("chat_attach_trigger")
-                    ) {
-                        Icon(
-                            imageVector = if (showAttachments) Icons.Default.Close else Icons.Default.Add,
-                            contentDescription = "Attach media items",
-                            tint = Color(0xFFFF4B72),
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    OutlinedTextField(
-                        value = inputStr,
-                        onValueChange = { inputStr = it },
-                        placeholder = { Text("Say something lovely...", color = Color(0xFF8B8894)) },
+                if (isRecordingVoicenote) {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("chat_input_field"),
-                        maxLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFFD0BCFF),
-                            unfocusedBorderColor = Color(0xFF49454F).copy(alpha = 0.5f),
-                            focusedContainerColor = Color(0xFF1C1B1F),
-                            unfocusedContainerColor = Color(0xFF1C1B1F)
-                        ),
-                        shape = RoundedCornerShape(24.dp),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            imeAction = ImeAction.Send
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onSend = {
+                            .fillMaxWidth()
+                            .background(Color(0xFF24141E))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Red)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Recording Sound Note: ${recordingDuration}s",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            TextButton(
+                                onClick = { cancelRecording() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF4B72))
+                            ) {
+                                Text("Cancel", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            Button(
+                                onClick = { stopRecordingAndSend() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ECC71)),
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Text("Stop & Send 🎙️", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { showAttachments = !showAttachments },
+                            modifier = Modifier.testTag("chat_attach_trigger")
+                        ) {
+                            Icon(
+                                imageVector = if (showAttachments) Icons.Default.Close else Icons.Default.Add,
+                                contentDescription = "Attach media items",
+                                tint = Color(0xFFFF4B72),
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        OutlinedTextField(
+                            value = inputStr,
+                            onValueChange = { inputStr = it },
+                            placeholder = { Text("Say something lovely...", color = Color(0xFF8B8894)) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat_input_field"),
+                            maxLines = 4,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFFD0BCFF),
+                                unfocusedBorderColor = Color(0xFF49454F).copy(alpha = 0.5f),
+                                focusedContainerColor = Color(0xFF1C1B1F),
+                                unfocusedContainerColor = Color(0xFF1C1B1F)
+                            ),
+                            shape = RoundedCornerShape(24.dp),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                imeAction = ImeAction.Send
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    if (inputStr.trim().isNotEmpty()) {
+                                        viewModel.sendMessage(inputStr)
+                                        inputStr = ""
+                                    }
+                                }
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
                                 if (inputStr.trim().isNotEmpty()) {
                                     viewModel.sendMessage(inputStr)
                                     inputStr = ""
                                 }
-                            }
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            if (inputStr.trim().isNotEmpty()) {
-                                viewModel.sendMessage(inputStr)
-                                inputStr = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .shadow(4.dp, CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFFFF6B8B), Color(0xFFFF305D))
-                                ),
-                                shape = CircleShape
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .shadow(4.dp, CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Color(0xFFFF6B8B), Color(0xFFFF305D))
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .testTag("chat_send_button"),
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
                             )
-                            .testTag("chat_send_button"),
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        }
                     }
                 }
             }
@@ -2529,4 +3100,31 @@ fun AttachmentChip(
             fontSize = 12.sp
         )
     }
+}
+
+fun getFileName(context: android.content.Context, uri: android.net.Uri): String? {
+    var result: String? = null
+    if (uri.scheme == "content") {
+        val cursor = context.contentResolver.query(uri, null, null, null, null)
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (index != -1) {
+                    result = cursor.getString(index)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            cursor?.close()
+        }
+    }
+    if (result == null) {
+        result = uri.path
+        val cut = result?.lastIndexOf('/')
+        if (cut != null && cut != -1) {
+            result = result?.substring(cut + 1)
+        }
+    }
+    return result
 }

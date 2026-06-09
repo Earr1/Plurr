@@ -25,6 +25,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCandidates(candidates: List<Candidate>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCandidate(candidate: Candidate)
+
     @Query("SELECT COUNT(*) FROM candidates")
     suspend fun getCandidateCount(): Int
 

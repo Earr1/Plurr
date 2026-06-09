@@ -97,8 +97,50 @@ class SparkViewModel(application: Application) : AndroidViewModel(application) {
                 isOnboarded = true
             )
             repository.saveUserProfile(newUser)
-            repository.clearAndReSeedCandidates()
+            // By default do NOT seed mock candidates if onboarding is complete!
+            // Let the user decide to seed them manually to respect their mock-free intent.
+            repository.clearCandidatesAndReset() 
             _currentScreen.value = Screen.Swipe
+        }
+    }
+
+    fun seedDemoProfiles() {
+        viewModelScope.launch {
+            repository.clearAndReSeedCandidates()
+        }
+    }
+
+    fun clearAllCandidates() {
+        viewModelScope.launch {
+            repository.clearCandidatesAndReset()
+        }
+    }
+
+    fun createNewCandidate(
+        name: String,
+        age: Int,
+        gender: String,
+        occupation: String,
+        bio: String,
+        interests: String,
+        avatarId: Int,
+        readyToMatch: Boolean
+    ) {
+        viewModelScope.launch {
+            val newC = Candidate(
+                id = (1000..999999).random(),
+                name = name,
+                age = age,
+                gender = gender,
+                job = occupation,
+                location = "Austin, TX",
+                bio = bio,
+                interests = interests,
+                avatarId = avatarId,
+                compatScore = (75..99).random(),
+                readyToMatch = readyToMatch
+            )
+            repository.insertCandidate(newC)
         }
     }
 

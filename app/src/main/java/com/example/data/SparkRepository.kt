@@ -76,6 +76,15 @@ class SparkRepository(private val appDao: AppDao) {
         seedCandidatesIfEmpty()
     }
 
+    suspend fun clearCandidatesAndReset() = withContext(Dispatchers.IO) {
+        appDao.clearCandidates()
+        appDao.clearSwipes()
+    }
+
+    suspend fun insertCandidate(candidate: Candidate) = withContext(Dispatchers.IO) {
+        appDao.insertCandidate(candidate)
+    }
+
     private fun generateDynamicCandidates(lookingFor: String): List<Candidate> {
         val femalePool = listOf(
             Triple("Aria Chen", "UI/UX Designer", "UX designer by day, pottery creator by night. Coffee runs on high speed, and indoor plants keep me busy! Looking for someone who enjoys aesthetic design and spontaneous road trips."),
