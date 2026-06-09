@@ -33,6 +33,12 @@ class SparkRepository(private val appDao: AppDao) {
     suspend fun swipeCandidate(candidateId: Int, isLiked: Boolean) = withContext(Dispatchers.IO) {
         val swipe = Swipe(candidateId = candidateId, isLiked = isLiked)
         appDao.insertSwipe(swipe)
+        if (isLiked) {
+            val candidate = appDao.getCandidateById(candidateId)
+            if (candidate?.readyToMatch == true) {
+                appDao.insertMatchRelationship(MatchRelationship(candidateId = candidateId))
+            }
+        }
     }
 
     suspend fun insertMessage(
@@ -73,12 +79,14 @@ class SparkRepository(private val appDao: AppDao) {
     suspend fun clearAndReSeedCandidates() = withContext(Dispatchers.IO) {
         appDao.clearCandidates()
         appDao.clearSwipes()
+        appDao.clearMatchRelationships()
         seedCandidatesIfEmpty()
     }
 
     suspend fun clearCandidatesAndReset() = withContext(Dispatchers.IO) {
         appDao.clearCandidates()
         appDao.clearSwipes()
+        appDao.clearMatchRelationships()
     }
 
     suspend fun insertCandidate(candidate: Candidate) = withContext(Dispatchers.IO) {

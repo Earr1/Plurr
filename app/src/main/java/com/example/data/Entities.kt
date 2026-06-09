@@ -53,3 +53,10 @@ data class Message(
     val longitude: Double? = null,
     val locationName: String? = null
 )
+
+@Entity(tableName = "match_relationships")
+data class MatchRelationship(
+    @PrimaryKey val candidateId: Int,
+    val matchedAt: Long = System.currentTimeMillis()
+)
+

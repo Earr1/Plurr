@@ -37,6 +37,9 @@ interface AppDao {
     @Query("DELETE FROM swipes")
     suspend fun clearSwipes()
 
+    @Query("DELETE FROM match_relationships")
+    suspend fun clearMatchRelationships()
+
     // Swipes
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSwipe(swipe: Swipe)
@@ -44,8 +47,18 @@ interface AppDao {
     @Query("SELECT * FROM swipes")
     fun getAllSwipes(): Flow<List<Swipe>>
 
-    // Matches (Dynamically derived from liked profiles)
-    @Query("SELECT * FROM candidates WHERE id IN (SELECT candidateId FROM swipes WHERE isLiked = 1)")
+    // Match Relationships
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMatchRelationship(match: MatchRelationship)
+
+    @Query("DELETE FROM match_relationships WHERE candidateId = :candidateId")
+    suspend fun deleteMatchRelationship(candidateId: Int)
+
+    @Query("SELECT * FROM match_relationships")
+    fun getAllMatchRelationships(): Flow<List<MatchRelationship>>
+
+    // Matches (Derived from match relationships)
+    @Query("SELECT * FROM candidates WHERE id IN (SELECT candidateId FROM match_relationships)")
     fun getMatchedCandidates(): Flow<List<Candidate>>
 
     @Query("SELECT * FROM candidates WHERE id = :id LIMIT 1")
