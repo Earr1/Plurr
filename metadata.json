@@ -1,0 +1,6 @@
+{
+  "name": "Spark",
+  "description": "A serverless SQLite-powered dating app with profile swiping, personalized matchmaking, local chat sessions, and profile styling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
